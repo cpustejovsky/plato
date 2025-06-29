@@ -11,25 +11,31 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/cpustejovsky/plato/router"
 )
 
 const ServerAddres string = "address"
 
 var addr = flag.String("addr", ":8080", "address for server")
-var disableoptshandler = flag.Bool("disableoptshandler", false, "whether to desable the general options handler")
+var disableoptshandler = flag.Bool("d", false, "whether to desable the general options handler")
 var idleTimeout = flag.Int64("i", 0, "Server IdleTimeout property (in seconds)")
-var readHeaderTimeout = flag.Int64("i", 0, "Server ReadHeaderTimeout property (in seconds)")
+var readHeaderTimeout = flag.Int64("r", 0, "Server ReadHeaderTimeout property (in seconds)")
 
 func main() {
 	flag.Parse()
-	mux := http.NewServeMux()
+	router, err := router.New()
+	if err != nil {
+		slog.Error("Error creating router", "error message", err.Error())
+		os.Exit(1)
+	}
 	// TODO: determine if writer for logger should be a variable determined by a flag
 	errorLog := slog.NewLogLogger(slog.NewJSONHandler(os.Stderr, nil), slog.LevelError)
 	svrCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	svr := http.Server{
 		Addr:              *addr,
-		Handler:           mux,
+		Handler:           router,
 		IdleTimeout:       time.Duration(*idleTimeout) * time.Second,
 		ReadHeaderTimeout: time.Duration(*readHeaderTimeout) * time.Second,
 		// NOTE: be default, will use DefaultMaxHeaderBytes;
@@ -40,12 +46,14 @@ func main() {
 		// ConnState: func(net.Conn, http.ConnState) {
 		// 	panic("TODO")
 		// },
+		// TODO: make sure this is the correct way to use BaseContext
 		BaseContext: func(l net.Listener) context.Context {
 			return context.WithValue(svrCtx, ServerAddres, l.Addr().String())
 		},
-		ConnContext: func(ctx context.Context, c net.Conn) context.Context {
-			panic("TODO")
-		},
+		// TODO: determine how to use this
+		// ConnContext: func(ctx context.Context, c net.Conn) context.Context {
+		// 	panic("TODO")
+		// },
 		// NOTE: https://www.rfc-editor.org/rfc/rfc7231#section-4.3.7
 		DisableGeneralOptionsHandler: *disableoptshandler,
 		// NOTE: TLSConfig not needed for deploying to AWS, GCP, etc.
@@ -53,8 +61,8 @@ func main() {
 		// NOTE: only set if you won't use HTTP/2
 		TLSNextProto: nil,
 		// NOTE: handlers should handle their own read and write timeouts
-		WriteTimeout: 0,
-		ReadTimeout:  0,
+		// WriteTimeout: 0,
+		// ReadTimeout:  0,
 		// NOTE: HTTP2 field currently has no effect.
 		// see: https://github.com/golang/go/issues/67813
 		HTTP2: nil,
