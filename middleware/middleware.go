@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+type MiddlewareFunc func(http.Handler) http.Handler
+
 // TODO: Turn into a struct with a ServeHTTP method to allow the passing in of a logger?
 func LogRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
